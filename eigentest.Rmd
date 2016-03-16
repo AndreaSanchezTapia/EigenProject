@@ -1,0 +1,146 @@
+---
+title: "Projeção a partir de eigenvariables"
+author: "Andrea Sánchez Tapia"
+date: "16 de marzo de 2016"
+output: 
+    html_document:
+        toc: TRUE
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,warning=F,message=F)
+```
+Vamos tentar fazer a projeção de um grupo de eigenvariables a outro. 
+Em vez de usar dois tempos, vou pegar dois estados do Brasil, Minas Gerais e São Paulo, para ver como fazer para projetar em Minas um modelo realizado a partir de eigenvariables correspondentes a São Paulo. 
+
+
+## Lê os dados
+```{r read.data,eval=T,echo=T}
+library(raster)
+library(maptools)
+library(scales)
+#de ocorrencias
+caryocar <- read.delim( "./data/caryocar.txt")
+# o shape do brasil
+bra <- readShapePoly("./data/BRA_adm/BRA_ADM1.SHP")
+
+#separa minas e sp
+MG <- bra[bra$ADM1 == "MINAS GERAIS",]
+SP <- bra[bra$ADM1 == "SAO PAULO",]
+
+#lê preditores
+predictors <-  stack(list.files("./env_10km/",full.names = T)[-24])
+plot(predictors[[1]])
+
+plot(bra,add=T)
+points(caryocar[,c(2,3)],pch = 19)
+```
+
+## Cria as variáveis ambientais para comparação
+
+```{r cria variaveis ambientais independentes,echo=T,eval=T}
+#minas
+env.mg <- crop(predictors,MG)
+env.mg <- mask(env.mg,MG)
+plot(env.mg[[1]])
+
+#sampa
+env.sp <- crop(predictors,SP)
+env.sp <- mask(env.sp,SP)
+plot(env.sp[[1]])
+```
+
+## Cria as eigenvariables desde São Paulo
+
+```{r pca.SP,echo=T,eval=T}
+#Cria as eigenvariables desde Sao Paulo:
+non.na <- sum(!is.na(values(env.sp[[1]])))
+sr.sp <- sampleRandom(env.sp, non.na)
+head(sr.sp[,1:6])
+pca.sp <- prcomp(scale(sr.sp))
+summary(pca.sp)#CINCO EIXOS explicam 95.19%
+```
+
+```{r rda,echo=F,eval=T}
+library(vegan)
+pca.v <- rda(scale(sr.sp))
+plot(pca.v, type="n", scaling = -1)
+points( pca.v, "sites",scaling = -1, pch = ".", col= "grey")
+text(pca.v, "species", scaling = -1)
+```
+```{r eigenSP,eval=T,echo=T}
+eigenvariables.sp <- predict(env.sp, pca.sp, index=1:5)
+plot(eigenvariables.sp)
+```
+
+## Projeta em MG e compara com eigen de lá
+
+```{r pca.MG, echo=T,eval=T}
+#Cria as eigenvariables desde Minas:
+non.na <- sum(!is.na(values(env.mg[[1]])))
+sr.mg <- sampleRandom(env.mg, non.na)
+head(sr.mg[,1:6])
+pca.mg <- prcomp(scale(sr.mg))
+summary(pca.mg)#SEIC EIXOS explicam 96.61%
+```
+
+```{r rdamd,echo=F,eval=T}
+library(vegan)
+pca.v <- rda(scale(sr.mg))
+plot(pca.v, type="n", scaling = -1)
+points( pca.v, "sites",scaling = -1, pch = ".", col= "grey")
+text(pca.v, "species", scaling = -1)
+```
+
+
+
+```{r eigenMG,echo=T, eval=T}
+# Cria as eigen de MG
+eigenvariables.mg <- predict(env.mg, pca.mg, index=1:6)
+plot(eigenvariables.mg)
+# Projeta as eigen de SP em MG (a partir de pca.sp)
+eigenvariables.sp.to.mg <- predict(env.mg, pca.sp, index=1:5)
+plot(eigenvariables.sp.to.mg)
+```
+
+Claramente não são espaços ambientais similares. Vamos juntar para checar. 
+
+```{r compara tudo,eval=F,echo=F}
+plot(eigenvariables.sp)
+plot(eigenvariables.sp.to.mg)
+plot(eigenvariables.mg)
+plot(eigenvariables.mg.to.sp)
+```
+
+## Juntando SP e MG: dataset com todos
+
+```{r SPMGjunto,eval=T,echo=T}
+estado <- as.factor(c(rep("SP",nrow(sr.sp)),rep("MG",nrow(sr.mg))))
+
+SP.MG <- rbind(sr.sp,sr.mg)
+
+pca.tudo <- rda(scale(SP.MG))
+plot(pca.tudo,type="n",scaling=-1)
+points(pca.tudo,"sites",col=alpha(unclass(estado)+1,0.3),scaling=-1,pch=19,cex=0.5)
+ordiellipse(pca.tudo,groups = estado, label= T)
+```
+
+# Próximos passos (feel free to add here):
+
++ Tentar plotar novos pontos do espaço ambientai mineiro sobre o PCA do espaço ambiental paulista.
++ Ver como isso funciona na hora de modelar.
+
+
+```{r writeEigen,echo=FALSE,eval=FALSE}
+#ESCREVE AS EIGENVARIABLES E ESQUECE O PASSADO:
+dir.create("./env_eigen")
+writeRaster(eigenvariables,"./env_eigen/eigen.tif",overwrite=T)
+
+#reads eigen
+eigen <- stack(list.files("./env_eigen/",full.names = T))
+plot(eigen)
+
+plot(eigen[[1]])
+points(caryocar[,c(2,3)],pch = 19)
+```

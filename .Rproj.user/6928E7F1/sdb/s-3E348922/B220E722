@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "\nsource(\"./fct/modelos.R\")\nsource(\"./fct/final_model.R\")\nsource(\"./fct/ensemble.R\")\nlibrary(\"raster\")\nlibrary(\"XML\")\nlibrary(\"snowfall\")\nlibrary(\"rJava\")\n#predictors <-  stack(list.files(\"./env\",full.names = T)[1])\n###dados de gcm\nlibrary(stringr)\nlibrary(raster)\nlibrary(data.table)\nnames<- list.files(\"~/datasets/original\")\nsplit <- str_split(names,\".zip\")\nfor (i in 1:length(split)) names[i]<-split[[i]][1]\nnames\nGCM <- list()\nfor (i in 1:3){\n  gcm <- names[i]\n  vars <- stack(list.files(paste0(\"~/datasets/data/\",gcm),pattern=\".tif\",full.names = T))\n  plot(vars[[1:19]]) \n  GCM[[i]] <- vars[[1:19]]\n}\nfor (i in 1:3) names(GCM[[i]]) <- sort(paste(\"bio\",1:19))\n\npredictors <- GCM[[1]]\n####Ler os dados de ocorrencia - tabela por registro----\nregistros<-read.csv(\"./data/Atlantic_Domain_Ari_RevTaxon_Final.csv\",sep=\";\")\n#checando NAs----\n\nspp.filt <- extract(predictors,registros[,6:5])\nspp.filt <- registros[complete.cases(spp.filt),]\nspp.filt$sp <- paste(spp.filt$genero,spp.filt$especie)\nnames.sp <- unique(spp.filt$sp)\nnames.sp <- names.sp[table(spp.filt$sp)>10] #considerando apenas spp com mais de 10 registros\n\t#tInicial <- Sys.time()\n\t\n\t#tFinal <- Sys.time()\n\t#tFinal - tInicial\n\n\t\nargs(dismo.mod)\ndismo.mod(sp=names.sp[2],\n          maxent=F,\n          BioClim=T,\n          Domain=F,\n          Mahal=F,\n          GLM=F,\n          RF=F,\n          SVM=F,\n          SVM2=F,\n          centroid=T,\n          mindist=T,\n          part=3,\n          seed=2411,\n          ENMeval=F,\n          output.folder=\"models\",\n          predictors=GCM[[1]],\n          project.model=T,\n          projections=c(\"past6\",\"past21\"),\n          projdata=list(GCM[[2]],GCM[[3]])\n          )\nargs(final.model)\na <-  final.model(names.sp[2],select.partitions=T,weight.partitions = T,output.folder=\"presfinal\",projection.folder=\"present\")\npar(mfrow=c(3,3))\ne <- ensemble(sp = \"Abarema cochliacarpos\",consensus.level=0.3,which.models = c(\"AUCweighted\",\"TSSweighted\",\"Final.bin.mean3\"),output.folder = \"alo\")\n#lapply(names.sp[1:2],dismo.mod,maxent=F,BioClim=F,Domain=T,Mahal=F,GLM=F,RF=F,SVM=F,SVM2=F,centroid=F,mindist=F, part=3, seed=2311,ENMeval=F,output.folder=\"models\", predictors=predictors)\n#lapply(names.sp[1:10],final.model,select.partitions=T,weight.partitions = T)\n#lapply(names.sp[1:2],ensemble)\nargs(ensemble)\n\nplot(mean(bin.sel))\n\nlapply(names.sp[1:10],dismo.mod,maxent=T,Bioclim=T,Domain=T,Mahal=T,GLM=T,RF=T,SVM=T,\n       SVM2=T, part=3, seed=2311,predictors=predictors)\nq()",
+    "created" : 1458138608729.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2871091433",
+    "id" : "B220E722",
+    "lastKnownWriteTime" : 1448452544,
+    "last_content_update" : 1448452544,
+    "path" : "~/Documents/2 Analisis de datos/ENM scripts/script.R",
+    "project_path" : null,
+    "properties" : {
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
